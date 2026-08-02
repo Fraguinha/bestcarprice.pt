@@ -1,0 +1,76 @@
+components:
+  frontend:
+    image: fraguinha/stand-frontend:latest
+    port: 8080
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 5m
+        memory: 32Mi
+      limits:
+        memory: 40Mi
+  backend:
+    image: fraguinha/stand-backend:latest
+    port: 8080
+    replicaCount: 2
+    env:
+      - name: PORT
+        value: "8080"
+      - name: NODE_ENV
+        value: production
+      - name: DATABASE
+        valueFrom:
+          secretKeyRef:
+            name: stand-secrets
+            key: DATABASE
+      - name: SECRET
+        valueFrom:
+          secretKeyRef:
+            name: stand-secrets
+            key: SECRET
+      - name: S3_ENDPOINT
+        valueFrom:
+          secretKeyRef:
+            name: stand-secrets
+            key: S3_ENDPOINT
+      - name: S3_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: stand-secrets
+            key: S3_ACCESS_KEY
+      - name: S3_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: stand-secrets
+            key: S3_SECRET_KEY
+      - name: S3_BUCKET
+        valueFrom:
+          secretKeyRef:
+            name: stand-secrets
+            key: S3_BUCKET
+      - name: S3_REGION
+        valueFrom:
+          secretKeyRef:
+            name: stand-secrets
+            key: S3_REGION
+    resources:
+      requests:
+        cpu: 5m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+ingress:
+  className: traefik
+  clusterIssuer: letsencrypt
+  externalDnsTarget: ""
+  hosts:
+    - stand.fraguinha.com
+  paths:
+    - path: /api
+      pathType: Prefix
+      component: backend
+    - path: /
+      pathType: Prefix
+      component: frontend
+  tls:
+    secretName: stand-tls-secret
