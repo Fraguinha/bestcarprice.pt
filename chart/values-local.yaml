@@ -1,0 +1,63 @@
+components:
+  frontend:
+    image: k3d-bestcarprice-registry:10000/fraguinha/bestcarprice-frontend:latest
+    port: 8080
+    replicaCount: 1
+  backend:
+    image: k3d-bestcarprice-registry:10000/fraguinha/bestcarprice-backend:latest
+    port: 8080
+    replicaCount: 1
+    probePath: /healthz
+    env:
+      - name: PORT
+        value: "8080"
+      - name: NODE_ENV
+        value: development
+      - name: DATABASE
+        valueFrom:
+          secretKeyRef:
+            name: bestcarprice-secrets
+            key: DATABASE
+      - name: SECRET
+        valueFrom:
+          secretKeyRef:
+            name: bestcarprice-secrets
+            key: SECRET
+      - name: S3_ENDPOINT
+        valueFrom:
+          secretKeyRef:
+            name: bestcarprice-secrets
+            key: S3_ENDPOINT
+      - name: S3_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: bestcarprice-secrets
+            key: S3_ACCESS_KEY
+      - name: S3_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: bestcarprice-secrets
+            key: S3_SECRET_KEY
+      - name: S3_BUCKET
+        valueFrom:
+          secretKeyRef:
+            name: bestcarprice-secrets
+            key: S3_BUCKET
+      - name: S3_REGION
+        valueFrom:
+          secretKeyRef:
+            name: bestcarprice-secrets
+            key: S3_REGION
+ingress:
+  className: traefik
+  clusterIssuer: ""
+  hosts:
+    - localhost
+  tls: null
+  paths:
+    - path: /api
+      pathType: Prefix
+      component: backend
+    - path: /
+      pathType: Prefix
+      component: frontend
