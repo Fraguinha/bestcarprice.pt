@@ -1,6 +1,6 @@
 components:
   frontend:
-    image: fraguinha/stand-frontend:latest
+    image: fraguinha/bestcarprice-frontend:latest
     port: 8080
     replicaCount: 2
     resources:
@@ -10,7 +10,7 @@ components:
       limits:
         memory: 40Mi
   backend:
-    image: fraguinha/stand-backend:latest
+    image: fraguinha/bestcarprice-backend:latest
     port: 8080
     replicaCount: 2
     probePath: /healthz

@@ -1,7 +1,7 @@
 import pg from "pg";
 import bcrypt from "bcryptjs";
 
-const DATABASE = process.env.DATABASE || "postgresql://localhost:5432/stand";
+const DATABASE = process.env.DATABASE || "postgresql://localhost:5432/bestcarprice";
 
 const pool = new pg.Pool({ connectionString: DATABASE });
 

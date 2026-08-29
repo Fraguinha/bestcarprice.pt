@@ -1,4 +1,4 @@
-const CACHE_NAME = 'stand-v1';
+const CACHE_NAME = 'bestcarprice-v1';
 const PRECACHE = ['/', '/inventory', '/company'];
 
 self.addEventListener('install', (event) => {

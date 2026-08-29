@@ -10,6 +10,6 @@ const s3 = new S3Client({
   forcePathStyle: true,
 });
 
-const bucket = process.env.S3_BUCKET || "stand";
+const bucket = process.env.S3_BUCKET || "bestcarprice";
 
 export default { s3, bucket };

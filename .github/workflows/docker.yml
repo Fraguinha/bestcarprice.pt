@@ -33,7 +33,7 @@ jobs:
         with:
           push: true
           platforms: linux/amd64,linux/arm/v7
-          tags: fraguinha/stand-backend:latest
+          tags: fraguinha/bestcarprice-backend:latest
           context: ./src/backend
           file: ./src/backend/Dockerfile
 
@@ -60,6 +60,6 @@ jobs:
         with:
           push: true
           platforms: linux/amd64,linux/arm/v7
-          tags: fraguinha/stand-frontend:latest
+          tags: fraguinha/bestcarprice-frontend:latest
           context: ./src/frontend
           file: ./src/frontend/Dockerfile

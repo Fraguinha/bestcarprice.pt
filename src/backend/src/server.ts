@@ -8,7 +8,7 @@ import routes from "./lib/setup/routes.js";
 
 const PORT = Number(process.env.PORT) || 8080;
 const SECRET = process.env.SECRET ?? "secret";
-const DATABASE = process.env.DATABASE || "postgresql://localhost:5432/stand";
+const DATABASE = process.env.DATABASE || "postgresql://localhost:5432/bestcarprice";
 
 const app = express();
 

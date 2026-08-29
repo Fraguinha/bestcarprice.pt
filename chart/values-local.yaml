@@ -1,10 +1,10 @@
 components:
   frontend:
-    image: k3d-stand-registry:10000/fraguinha/stand-frontend:latest
+    image: k3d-bestcarprice-registry:10000/fraguinha/bestcarprice-frontend:latest
     port: 8080
     replicaCount: 1
   backend:
-    image: k3d-stand-registry:10000/fraguinha/stand-backend:latest
+    image: k3d-bestcarprice-registry:10000/fraguinha/bestcarprice-backend:latest
     port: 8080
     replicaCount: 1
     probePath: /healthz
