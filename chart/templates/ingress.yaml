@@ -9,7 +9,7 @@ metadata:
     cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
     {{- end }}
     {{- if .Values.ingress.externalDnsTarget }}
-    external-dns.alpha.kubernetes.io/target: {{ .Values.ingress.externalDnsTarget | quote }}
+    external-dns.kubernetes.io/target: {{ .Values.ingress.externalDnsTarget | quote }}
     {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
