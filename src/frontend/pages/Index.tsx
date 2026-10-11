@@ -110,7 +110,7 @@ const faqs = [
 
 export default function Index() {
   const { data: allCars, isLoading: carsLoading } = useCars();
-  const featuredCars = allCars?.filter((c) => c.featured);
+  const featuredCars = allCars?.filter((c) => c.featured && !c.sold);
   const featuredLoading = carsLoading;
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const reviewsRef = useRef<HTMLDivElement>(null);
@@ -165,7 +165,7 @@ export default function Index() {
 
   const featuredIds = new Set((featuredCars ?? []).map((c) => c.id));
   const latestCars = (allCars ?? [])
-    .filter((c) => !featuredIds.has(c.id))
+    .filter((c) => !c.sold && !featuredIds.has(c.id))
     .slice(0, 6);
 
   return (

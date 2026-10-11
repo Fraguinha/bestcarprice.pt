@@ -23,23 +23,25 @@ function compareKnownFirst(a: number, b: number, descending = false): number {
 }
 
 function sortCars(cars: Car[], sort: SortOption): Car[] {
-  const sorted = [...cars];
-  switch (sort) {
-    case "price_asc":
-      return sorted.sort((a, b) => compareKnownFirst(a.price, b.price));
-    case "price_desc":
-      return sorted.sort((a, b) => compareKnownFirst(a.price, b.price, true));
-    case "registration_desc":
-      return sorted.sort((a, b) => {
+  return [...cars].sort((a, b) => {
+    if (a.sold !== b.sold) return a.sold ? 1 : -1;
+
+    switch (sort) {
+      case "price_asc":
+        return compareKnownFirst(a.price, b.price);
+      case "price_desc":
+        return compareKnownFirst(a.price, b.price, true);
+      case "registration_desc": {
         const aMonth = registrationMonth(a.registration_date);
         const bMonth = registrationMonth(b.registration_date);
         if (aMonth === null) return bMonth === null ? 0 : 1;
         return bMonth === null ? -1 : bMonth - aMonth;
-      });
-    case "recent":
-    default:
-      return sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }
+      }
+      case "recent":
+      default:
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+  });
 }
 
 function parseRegistrationYear(value: string | null): number | undefined {

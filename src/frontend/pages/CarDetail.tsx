@@ -46,7 +46,7 @@ export default function CarDetail() {
       return s;
     };
     return allCars
-      .filter((c) => c.id !== car.id && (car.transmission === "Manual" || c.transmission === car.transmission))
+      .filter((c) => !c.sold && c.id !== car.id && (car.transmission === "Manual" || c.transmission === car.transmission))
       .map((c) => ({ car: c, score: score(c) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 3)
