@@ -1,4 +1,6 @@
-import { DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { GetObjectCommand, HeadObjectCommand, S3ServiceException } from "@aws-sdk/client-s3";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import express, { Request, Response } from "express";
 import s3Config from "../lib/setup/s3.js";
 import { cleanupCarImages, uploadCarImages } from "../lib/uploadCarImages.js";
@@ -32,15 +34,6 @@ const isValidRegistrationDate = (value: unknown): value is string =>
 
 const isValidRegistrationYear = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9]{1,4}$/.test(value) && Number(value) >= 1;
-
-const deleteImageFromS3 = async (key: string): Promise<void> => {
-  await s3Config.s3.send(
-    new DeleteObjectCommand({
-      Bucket: s3Config.bucket,
-      Key: key,
-    })
-  );
-};
 
 router.get("/cars/featured", async (_req, res) => {
   const cars = await findFeaturedCars();
@@ -290,61 +283,88 @@ router.delete("/cars/:id", authenticator, async (req, res) => {
     return;
   }
 
-  for (const key of existing.images) {
-    await deleteImageFromS3(key);
+  const deleted = await deleteCar(id);
+  if (!deleted) {
+    res.status(404).json({ error: "Car not found" });
+    return;
   }
 
-  await deleteCar(id);
+  await cleanupCarImages(existing.images, s3Config.s3, s3Config.bucket);
   res.json({ success: true });
 });
 
 const serveS3Object = async (key: string, req: Request, res: Response): Promise<void> => {
+  const controller = new AbortController();
+  let body: Readable | undefined;
+  const onDisconnect = (): void => {
+    if (!res.writableFinished) {
+      controller.abort();
+      body?.destroy();
+      if (!res.destroyed) res.destroy();
+    }
+  };
+  res.on("close", onDisconnect);
+  req.on("aborted", onDisconnect);
+
   try {
-    const headCommand = new GetObjectCommand({
-      Bucket: s3Config.bucket,
-      Key: key,
-    });
-    const headResponse = await s3Config.s3.send(headCommand);
-    if (!headResponse.Body) {
+    const range = req.headers.range?.trim();
+    const requestedRange = range && /^bytes=(?:\d+-\d*|-\d+)$/.test(range) ? range : undefined;
+    const response = await s3Config.s3.send(
+      new GetObjectCommand({
+        Bucket: s3Config.bucket,
+        Key: key,
+        ...(requestedRange ? { Range: requestedRange } : {}),
+      }),
+      { abortSignal: controller.signal }
+    );
+    if (!response.Body) {
       res.status(404).json({ error: "Not found" });
       return;
     }
-
-    const contentType = headResponse.ContentType || "application/octet-stream";
-    const contentLength = headResponse.ContentLength || 0;
-    const rangeHeader = req.headers.range;
-
-    if (rangeHeader && contentLength) {
-      const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
-      if (match) {
-        const start = parseInt(match[1]!, 10);
-        const end = match[2] ? parseInt(match[2], 10) : contentLength - 1;
-        const rangeCommand = new GetObjectCommand({
-          Bucket: s3Config.bucket,
-          Key: key,
-          Range: `bytes=${start}-${end}`,
-        });
-        const rangeResponse = await s3Config.s3.send(rangeCommand);
-        const bytes = await rangeResponse.Body!.transformToByteArray();
-        res.status(206);
-        res.setHeader("Content-Type", contentType);
-        res.setHeader("Content-Length", bytes.length);
-        res.setHeader("Content-Range", `bytes ${start}-${end}/${contentLength}`);
-        res.setHeader("Accept-Ranges", "bytes");
-        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        res.end(Buffer.from(bytes));
-        return;
-      }
+    if (!(response.Body instanceof Readable)) {
+      throw new Error("S3 returned a non-streaming response body");
+    }
+    body = response.Body;
+    if (controller.signal.aborted) {
+      body.destroy();
+      return;
     }
 
-    const bytes = await headResponse.Body!.transformToByteArray();
-    res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Length", bytes.length);
+    res.status(response.ContentRange || response.$metadata.httpStatusCode === 206 ? 206 : 200);
+    res.setHeader("Content-Type", response.ContentType || "application/octet-stream");
+    if (response.ContentLength !== undefined) res.setHeader("Content-Length", response.ContentLength);
+    if (response.ContentRange) res.setHeader("Content-Range", response.ContentRange);
     res.setHeader("Accept-Ranges", "bytes");
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-    res.end(Buffer.from(bytes));
-  } catch {
-    res.status(404).json({ error: "Not found" });
+    await pipeline(body, res, { signal: controller.signal });
+  } catch (error) {
+    if (res.destroyed) return;
+    if (res.headersSent) {
+      res.destroy(error instanceof Error ? error : undefined);
+      return;
+    }
+    const status = error instanceof S3ServiceException ? error.$metadata.httpStatusCode : undefined;
+    if (status === 416) {
+      try {
+        const metadata = await s3Config.s3.send(
+          new HeadObjectCommand({ Bucket: s3Config.bucket, Key: key }),
+          { abortSignal: controller.signal }
+        );
+        if (metadata.ContentLength !== undefined) {
+          res.setHeader("Content-Range", `bytes */${metadata.ContentLength}`);
+        }
+      } catch {}
+      if (res.destroyed) return;
+      res.setHeader("Accept-Ranges", "bytes");
+      res.status(416).end();
+      return;
+    }
+    res.status(status === 404 ? 404 : 502).json({
+      error: status === 404 ? "Not found" : "Failed to load image",
+    });
+  } finally {
+    res.off("close", onDisconnect);
+    req.off("aborted", onDisconnect);
   }
 };
 
