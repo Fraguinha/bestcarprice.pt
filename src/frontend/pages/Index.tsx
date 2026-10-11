@@ -113,8 +113,20 @@ export default function Index() {
   const featuredCars = allCars?.filter((c) => c.featured && !c.sold);
   const featuredLoading = carsLoading;
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [heroVideoPlaying, setHeroVideoPlaying] = useState(false);
+  const heroVideoRef = useRef<HTMLVideoElement>(null);
   const reviewsRef = useRef<HTMLDivElement>(null);
   const reviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const breakpoint = window.matchMedia("(min-width: 768px)");
+    const reloadVideo = () => {
+      setHeroVideoPlaying(false);
+      heroVideoRef.current?.load();
+    };
+    breakpoint.addEventListener("change", reloadVideo);
+    return () => breakpoint.removeEventListener("change", reloadVideo);
+  }, []);
 
   const CARD_WIDTH = 340;
   const CARD_GAP = 24;
@@ -171,17 +183,35 @@ export default function Index() {
   return (
     <div className="flex flex-col min-h-screen"><Helmet><title>Best Car Price | Qualidade que se conduz</title><meta name="description" content="Viaturas premium selecionadas com rigor em Oliveira de Frades" /></Helmet>
       <section className="relative overflow-hidden bg-dark-section aspect-[9/16] md:aspect-[1280/544]">
+        <picture className="absolute inset-0 block">
+          <source media="(min-width: 768px)" srcSet="/api/images/assets/hero-poster-desktop-v2.webp" />
+          <img
+            src="/api/images/assets/hero-poster-mobile-v2.webp"
+            alt=""
+            loading="eager"
+            fetchPriority="high"
+            className="w-full h-full object-cover"
+          />
+        </picture>
         <video
+          ref={heroVideoRef}
           autoPlay
           muted
           loop
           playsInline
-          // @ts-ignore
-          webkit-playsinline="true"
           preload="auto"
-          className="absolute inset-0 w-full h-full object-cover"
-          src="/api/images/assets/hero-video.mp4"
-        />
+          className={`absolute inset-0 w-full h-full object-cover ${heroVideoPlaying ? "opacity-100" : "opacity-0"}`}
+          onPlaying={(event) => {
+            if (event.currentTarget.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+              setHeroVideoPlaying(true);
+            }
+          }}
+          onPause={() => setHeroVideoPlaying(false)}
+          onError={() => setHeroVideoPlaying(false)}
+        >
+          <source media="(min-width: 768px)" src="/api/images/assets/hero-desktop-v2.mp4" type="video/mp4" />
+          <source media="(max-width: 767px)" src="/api/images/assets/hero-mobile-v2.mp4" type="video/mp4" />
+        </video>
         <div className="absolute inset-0 bg-black/50" />
         <div className="absolute inset-0 flex items-center justify-center px-6">
           <div className="text-center">
