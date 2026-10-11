@@ -512,7 +512,7 @@ export default function Admin() {
                       className={`relative w-28 rounded-md ${drag?.kind === visibleImageKind && drag.from === i ? "opacity-50" : ""} ${drag?.kind === visibleImageKind && drag.to === i && drag.from !== i ? "ring-2 ring-primary" : ""}`}
                     >
                       <img
-                        src={typeof image === "string" ? getImageUrl(image) : image.url}
+                        src={typeof image === "string" ? getImageUrl(image, "thumb") : image.url}
                         alt={`Fotografia ${i + 1} de ${visibleImages.length}`}
                         className="w-28 h-20 object-cover rounded-md"
                       />
@@ -600,7 +600,7 @@ export default function Admin() {
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
                 <div className="shrink-0 w-16 h-12 md:w-24 md:h-16 rounded-md overflow-hidden bg-muted">
                   {car.images.length > 0 ? (
-                    <img src={getImageUrl(car.images[0]!)} alt={car.make} className="w-full h-full object-cover" />
+                    <img src={getImageUrl(car.images[0]!, "thumb")} alt={car.make} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
                       Sem foto

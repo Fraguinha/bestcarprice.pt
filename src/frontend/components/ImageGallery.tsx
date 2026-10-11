@@ -11,21 +11,40 @@ interface ImageGalleryProps {
 }
 
 export default function ImageGallery({ images, alt, fullWidth }: ImageGalleryProps) {
-  const [current, setCurrent] = useState(0);
+  const [navigation, setNavigation] = useState({ index: 0, animate: true, preview: false });
+  const current = navigation.index < images.length ? navigation.index : 0;
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [loadedThumbnails, setLoadedThumbnails] = useState<Set<string>>(() => new Set());
   const startX = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const thumbnailsRef = useRef<HTMLDivElement>(null);
 
-  const prev = useCallback(
-    () => setCurrent((c) => (c === 0 ? images.length - 1 : c - 1)),
-    [images.length],
-  );
+  const prev = useCallback(() => {
+    if (images.length < 2) return;
+    setNavigation(({ index }) => {
+      const from = index < images.length ? index : 0;
+      const destination = (from + images.length - 1) % images.length;
+      return { index: destination, animate: destination === from - 1, preview: false };
+    });
+  }, [images.length]);
 
-  const next = useCallback(
-    () => setCurrent((c) => (c === images.length - 1 ? 0 : c + 1)),
-    [images.length],
-  );
+  const next = useCallback(() => {
+    if (images.length < 2) return;
+    setNavigation(({ index }) => {
+      const from = index < images.length ? index : 0;
+      const destination = (from + 1) % images.length;
+      return { index: destination, animate: destination === from + 1, preview: false };
+    });
+  }, [images.length]);
+
+  const jumpTo = (index: number) => {
+    setNavigation((previous) => {
+      if (previous.index === index) return previous;
+      const distance = Math.abs(previous.index - index);
+      return { index, animate: distance === 1, preview: distance > 1 };
+    });
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -36,6 +55,32 @@ export default function ImageGallery({ images, alt, fullWidth }: ImageGalleryPro
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [prev, next]);
+
+  useEffect(() => {
+    const strip = thumbnailsRef.current;
+    if (!strip) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setLoadedThumbnails((loaded) => images.every((image) => loaded.has(image)) ? loaded : new Set([...loaded, ...images]));
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      const visibleImages: string[] = [];
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const image = images[Number((entry.target as HTMLElement).dataset.thumbnailIndex)];
+        if (image !== undefined) visibleImages.push(image);
+        observer.unobserve(entry.target);
+      }
+      if (visibleImages.length) {
+        setLoadedThumbnails((loaded) => {
+          if (visibleImages.every((image) => loaded.has(image))) return loaded;
+          return new Set([...loaded, ...visibleImages]);
+        });
+      }
+    }, { root: strip });
+    strip.querySelectorAll<HTMLButtonElement>("[data-thumbnail-index]").forEach((button) => observer.observe(button));
+    return () => observer.disconnect();
+  }, [images]);
 
   const onDragStart = (x: number) => {
     if (images.length < 2) return;
@@ -91,22 +136,41 @@ export default function ImageGallery({ images, alt, fullWidth }: ImageGalleryPro
         onMouseLeave={handleMouseLeave}
       >
         <div
-          className={`flex h-full ${isDragging ? "" : "transition-transform duration-300 ease-out"}`}
+          className={`flex h-full ${isDragging || !navigation.animate ? "" : "transition-transform duration-300 ease-out"}`}
           style={{
             width: `${images.length * 100}%`,
             transform: `translateX(calc(-${current * (100 / images.length)}% + ${dragOffset}px))`,
           }}
         >
-          {images.map((img, i) => (
-            <img
-              key={img}
-              src={getImageUrl(img)}
-              alt={`${alt} - ${i + 1}`}
-              className="h-full object-cover pointer-events-none"
-              style={{ width: `${100 / images.length}%` }}
-              draggable={false}
-            />
-          ))}
+          {images.map((img, i) => {
+            const isNeighbor = i === current || i === (current + 1) % images.length || i === (current + images.length - 1) % images.length;
+            return isNeighbor ? (
+              <div
+                key={i}
+                className="h-full shrink-0"
+                style={{
+                  width: `${100 / images.length}%`,
+                  backgroundImage: i === current && navigation.preview ? `url("${getImageUrl(img, "thumb")}")` : undefined,
+                  backgroundPosition: "center",
+                  backgroundSize: "cover",
+                }}
+              >
+                <img
+                  src={getImageUrl(img, "gallery")}
+                  srcSet={`${getImageUrl(img, "card")} 800w, ${getImageUrl(img, "gallery")} 1280w, ${getImageUrl(img)} 1920w`}
+                  sizes="100vw"
+                  alt={`${alt} - ${i + 1}`}
+                  aria-hidden={i !== current}
+                  className="w-full h-full object-cover pointer-events-none"
+                  draggable={false}
+                  loading="eager"
+                  fetchPriority={i === current ? "high" : "low"}
+                />
+              </div>
+            ) : (
+              <div key={i} aria-hidden className="h-full shrink-0" style={{ width: `${100 / images.length}%` }} />
+            );
+          })}
         </div>
         {images.length > 1 && (
           <>
@@ -136,20 +200,29 @@ export default function ImageGallery({ images, alt, fullWidth }: ImageGalleryPro
         )}
       </div>
       {images.length > 1 && (
-        <div className={`flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${fullWidth ? "px-4 md:px-8 pt-3" : ""}`}>
+        <div
+          ref={thumbnailsRef}
+          className={`flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${fullWidth ? "px-4 md:px-8 pt-3" : ""}`}
+        >
           {images.map((img, i) => (
             <button
-              key={img}
-              onClick={() => setCurrent(i)}
+              key={i}
+              data-thumbnail-index={i}
+              aria-label={`${alt} - fotografia ${i + 1}`}
+              onClick={() => jumpTo(i)}
               className={`shrink-0 w-20 h-14 md:w-24 md:h-16 rounded-md overflow-hidden transition-all ${
                 i === current ? "ring-2 ring-primary" : "ring-0 opacity-60 hover:opacity-100"
               }`}
             >
-              <img
-                src={getImageUrl(img)}
-                alt={`${alt} thumbnail ${i + 1}`}
-                className="w-full h-full object-cover"
-              />
+              {loadedThumbnails.has(img) && (
+                <img
+                  src={getImageUrl(img, "thumb")}
+                  alt={`${alt} thumbnail ${i + 1}`}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              )}
             </button>
           ))}
         </div>

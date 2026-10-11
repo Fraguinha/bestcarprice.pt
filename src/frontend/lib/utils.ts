@@ -29,6 +29,7 @@ export function formatMileage(km: number): string {
   return km.toLocaleString("pt-PT", { useGrouping: true }).replace(/,/g, " ") + " km";
 }
 
-export function getImageUrl(key: string): string {
-  return `/api/images/${key}`;
+export function getImageUrl(key: string, variant?: "thumb" | "card" | "gallery"): string {
+  const imageKey = variant ? key.replace(/\.webp$/, `-${variant}.webp`) : key;
+  return `/api/images/${imageKey}`;
 }

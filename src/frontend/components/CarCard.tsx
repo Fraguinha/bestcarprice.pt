@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -15,18 +15,50 @@ export default function CarCard({ car, isNew }: CarCardProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [skipTransition, setSkipTransition] = useState(false);
+  const [nearViewport, setNearViewport] = useState(false);
   const startX = useRef(0);
   const didSwipe = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const hasMultiple = car.images.length >= 2;
+  const imageCount = car.images.length;
+  const hasMultiple = imageCount >= 2;
+  const activeIndex = imageCount > 0 ? currentIndex % imageCount : 0;
+  const visibleIndices = imageCount <= 1
+    ? [0]
+    : imageCount === 2
+      ? [0, 1]
+      : [(activeIndex - 1 + imageCount) % imageCount, activeIndex, (activeIndex + 1) % imageCount];
+
+  useEffect(() => {
+    setCurrentIndex((index) => imageCount > 0 ? index % imageCount : 0);
+  }, [imageCount]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setNearViewport(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => setNearViewport(entries[0]?.isIntersecting ?? false),
+      { rootMargin: "400px" },
+    );
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   const goNext = useCallback(() => {
-    if (hasMultiple) setCurrentIndex((i) => (i + 1) % car.images.length);
-  }, [car.images.length, hasMultiple]);
+    if (!hasMultiple) return;
+    setSkipTransition(activeIndex === imageCount - 1);
+    setCurrentIndex((i) => ((i % imageCount) + 1) % imageCount);
+  }, [activeIndex, imageCount, hasMultiple]);
 
   const goPrev = useCallback(() => {
-    if (hasMultiple) setCurrentIndex((i) => (i - 1 + car.images.length) % car.images.length);
-  }, [car.images.length, hasMultiple]);
+    if (!hasMultiple) return;
+    setSkipTransition(activeIndex === 0);
+    setCurrentIndex((i) => ((i % imageCount) - 1 + imageCount) % imageCount);
+  }, [activeIndex, imageCount, hasMultiple]);
 
   const onDragStart = (x: number) => {
     if (!hasMultiple) return;
@@ -81,24 +113,32 @@ export default function CarCard({ car, isNew }: CarCardProps) {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         >
-          {car.images.length > 0 ? (
+          {imageCount > 0 ? (
             <div
-              className={`flex h-full ${isDragging ? "" : "transition-transform duration-300 ease-out"}`}
+              className={`relative h-full ${isDragging || skipTransition || currentIndex !== activeIndex ? "" : "transition-transform duration-300 ease-out"}`}
               style={{
-                width: `${car.images.length * 100}%`,
-                transform: `translateX(calc(-${currentIndex * (100 / car.images.length)}% + ${dragOffset}px))`,
+                width: `${imageCount * 100}%`,
+                transform: `translateX(calc(-${activeIndex * (100 / imageCount)}% + ${dragOffset}px))`,
               }}
             >
-              {car.images.map((img) => (
-                <img
-                  key={img}
-                  src={getImageUrl(img)}
-                  alt={`${car.make} ${car.model}`}
-                  className="h-full object-cover pointer-events-none"
-                  style={{ width: `${100 / car.images.length}%` }}
-                  draggable={false} loading="lazy"
-                />
-              ))}
+              {visibleIndices.map((index) => {
+                const image = car.images[index]!;
+                const cardUrl = getImageUrl(image, "card");
+                return (
+                  <img
+                    key={index}
+                    src={cardUrl}
+                    srcSet={`${cardUrl} 800w, ${getImageUrl(image, "gallery")} 1280w`}
+                    sizes="(min-width: 1024px) 400px, (min-width: 768px) 50vw, 100vw"
+                    alt={`${car.make} ${car.model}`}
+                    className="absolute top-0 h-full object-cover pointer-events-none"
+                    style={{ left: `${index * (100 / imageCount)}%`, width: `${100 / imageCount}%` }}
+                    draggable={false}
+                    loading={nearViewport ? "eager" : "lazy"}
+                    fetchPriority={index === activeIndex ? "high" : "low"}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -135,7 +175,7 @@ export default function CarCard({ car, isNew }: CarCardProps) {
             </span>
             {hasMultiple && (
               <PhotoIndicators
-                currentIndex={currentIndex}
+                currentIndex={activeIndex}
                 total={car.images.length}
                 variant="card"
                 className="flex-1"
