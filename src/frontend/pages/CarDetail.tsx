@@ -70,7 +70,7 @@ export default function CarDetail() {
   if (isLoading) {
     return (
       <div>
-        <div className="w-full aspect-[3/2] md:aspect-[2/1] bg-muted animate-pulse" />
+        <div className="w-full aspect-[3/2] md:aspect-[2/1] bg-muted animate-pulse md:mx-auto md:mt-6 md:max-w-5xl md:rounded-xl" />
         <div className="container py-8 animate-pulse space-y-4">
           <div className="h-8 bg-muted rounded w-64" />
           <div className="h-6 bg-muted rounded w-48" />
@@ -109,7 +109,7 @@ export default function CarDetail() {
 
   return (
     <div><Helmet><title>{car.make} {car.model} {car.version || ""} | Best Car Price</title><meta name="description" content={`${car.make} ${car.model} ${car.registration_date ? `Data de Registo ${car.registration_date}` : "Data de Registo por confirmar"} - ${car.fuel} ${car.transmission} ${car.power === 0 ? formatPower(car.power) : `${car.power}cv`}`} /><meta property="og:image" content={car.images.length > 0 ? `/api/images/${car.images[0]}` : ""} /></Helmet>
-      <div className="relative w-full bg-muted">
+      <div className="relative w-full bg-muted md:mx-auto md:mt-6 md:max-w-5xl md:overflow-hidden md:rounded-xl">
         <ImageGallery images={car.images} alt={`${car.make} ${car.model}`} fullWidth />
         {car.sold && (
           <span className="absolute top-4 right-4 z-10 rounded-md bg-destructive px-4 py-2 text-base font-bold uppercase tracking-wide text-destructive-foreground shadow-md pointer-events-none md:right-8">
