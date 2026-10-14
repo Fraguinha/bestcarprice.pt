@@ -16,6 +16,7 @@ export default function ImageGallery({ images, alt, fullWidth }: ImageGalleryPro
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [loadedThumbnails, setLoadedThumbnails] = useState<Set<string>>(() => new Set());
+  const [thumbnailOverflow, setThumbnailOverflow] = useState(false);
   const startX = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const thumbnailsRef = useRef<HTMLDivElement>(null);
@@ -82,6 +83,27 @@ export default function ImageGallery({ images, alt, fullWidth }: ImageGalleryPro
     return () => observer.disconnect();
   }, [images]);
 
+  useEffect(() => {
+    const strip = thumbnailsRef.current;
+    if (!strip) return;
+    const update = () => setThumbnailOverflow(strip.scrollWidth > strip.clientWidth + 1);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(strip);
+    return () => observer.disconnect();
+  }, [images.length]);
+
+  useEffect(() => {
+    const strip = thumbnailsRef.current;
+    const active = strip?.children.item(current);
+    if (!strip || !active) return;
+    const bounds = strip.getBoundingClientRect();
+    const selected = active.getBoundingClientRect();
+    if (selected.left < bounds.left || selected.right > bounds.right) {
+      strip.scrollLeft += selected.left - bounds.left - (bounds.width - selected.width) / 2;
+    }
+  }, [current]);
+
   const onDragStart = (x: number) => {
     if (images.length < 2) return;
     startX.current = x;
@@ -126,7 +148,7 @@ export default function ImageGallery({ images, alt, fullWidth }: ImageGalleryPro
       <div
         ref={containerRef}
         tabIndex={0}
-        className={`relative overflow-hidden bg-muted select-none ${fullWidth ? "aspect-[4/3] md:aspect-[2/1]" : "aspect-[3/2] rounded-lg"}`}
+        className={`relative overflow-clip touch-pan-y bg-muted select-none ${fullWidth ? "aspect-[4/3] md:aspect-[2/1]" : "aspect-[3/2] rounded-lg"}`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -200,31 +222,55 @@ export default function ImageGallery({ images, alt, fullWidth }: ImageGalleryPro
         )}
       </div>
       {images.length > 1 && (
-        <div
-          ref={thumbnailsRef}
-          className={`flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${fullWidth ? "px-4 md:px-8 pt-3" : ""}`}
-        >
-          {images.map((img, i) => (
-            <button
-              key={i}
-              data-thumbnail-index={i}
-              aria-label={`${alt} - fotografia ${i + 1}`}
-              onClick={() => jumpTo(i)}
-              className={`shrink-0 w-20 h-14 md:w-24 md:h-16 rounded-md overflow-hidden transition-all ${
-                i === current ? "ring-2 ring-primary" : "ring-0 opacity-60 hover:opacity-100"
-              }`}
-            >
-              {loadedThumbnails.has(img) && (
-                <img
-                  src={getImageUrl(img, "thumb")}
-                  alt={`${alt} thumbnail ${i + 1}`}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-              )}
-            </button>
-          ))}
+        <div className="relative">
+          <div
+            ref={thumbnailsRef}
+            className={`flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${fullWidth ? "px-4 md:px-12 pt-3" : ""}`}
+          >
+            {images.map((img, i) => (
+              <button
+                key={i}
+                data-thumbnail-index={i}
+                aria-label={`${alt} - fotografia ${i + 1}`}
+                onClick={() => jumpTo(i)}
+                className={`shrink-0 w-20 h-14 md:w-24 md:h-16 rounded-md overflow-hidden transition-all ${
+                  i === current ? "ring-2 ring-primary" : "ring-0 opacity-60 hover:opacity-100"
+                }`}
+              >
+                {loadedThumbnails.has(img) && (
+                  <img
+                    src={getImageUrl(img, "thumb")}
+                    alt={`${alt} thumbnail ${i + 1}`}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+          {fullWidth && thumbnailOverflow && (
+            <>
+              <Button type="button" variant="secondary" size="icon" aria-label="Ver miniaturas anteriores"
+                className="absolute left-2 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 rounded-full border-0 bg-black/60 text-white shadow-md hover:bg-black/75 md:flex"
+                onClick={() => {
+                  const strip = thumbnailsRef.current;
+                  if (strip) strip.scrollBy({ left: -strip.clientWidth * 0.8, behavior: "smooth" });
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button type="button" variant="secondary" size="icon" aria-label="Ver miniaturas seguintes"
+                className="absolute right-2 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 rounded-full border-0 bg-black/60 text-white shadow-md hover:bg-black/75 md:flex"
+                onClick={() => {
+                  const strip = thumbnailsRef.current;
+                  if (strip) strip.scrollBy({ left: strip.clientWidth * 0.8, behavior: "smooth" });
+                }}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
       )}
     </div>
