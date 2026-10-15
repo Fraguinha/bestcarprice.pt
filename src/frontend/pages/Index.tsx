@@ -566,6 +566,12 @@ export default function Index() {
           </div>
           <div className="border-t border-dark-section-foreground/10 pt-8 text-center text-sm text-dark-section-foreground/40">
             © {new Date().getFullYear()} {SITE.name}. Todos os direitos reservados.
+            <p className="mt-2">
+              Created by:{" "}
+              <a href="https://fraguinha.com" className="hover:text-dark-section-foreground transition-colors">
+                fraguinha
+              </a>
+            </p>
           </div>
         </div>
       </footer>
